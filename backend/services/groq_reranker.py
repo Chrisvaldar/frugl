@@ -4,6 +4,8 @@ import re
 
 from groq import Groq
 
+from services.log_util import truncate
+
 logger = logging.getLogger(__name__)
 
 RERANK_MODEL = "llama-3.1-8b-instant"
@@ -123,19 +125,19 @@ def _build_prompt(query: str, candidate_lines: str, max_index: int) -> str:
 
 def rerank_with_groq(query: str, candidates: list[dict]) -> dict | None:
     """Pick the best API candidate for a receipt line, or None if no good match."""
-    print(f"[rerank_with_groq] called query={query!r} candidates={len(candidates)}")
-    print(f"[rerank_with_groq] is_produce_query={is_produce_query(query)}")
-    for index, item in enumerate(candidates):
-        print(f"[rerank_with_groq]   {_format_candidate(index, item)}")
-
     if not candidates:
-        print("[rerank_with_groq] skipping — no candidates")
         return None
 
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
-        print("[rerank_with_groq] skipping — GROQ_API_KEY not set")
+        logger.warning("Groq rerank skipped — GROQ_API_KEY not set")
         return None
+
+    logger.debug(
+        "Groq rerank: %d candidates, produce=%s",
+        len(candidates),
+        is_produce_query(query),
+    )
 
     candidate_lines = "\n".join(
         _format_candidate(index, item) for index, item in enumerate(candidates)
@@ -160,27 +162,23 @@ def rerank_with_groq(query: str, candidates: list[dict]) -> dict | None:
             temperature=0,
         )
         text = (response.choices[0].message.content or "").strip()
-        print(f"[rerank_with_groq] raw Groq response={text!r}")
         match = re.search(r"-?\d+", text)
         if not match:
-            print("[rerank_with_groq] no integer found in response")
+            logger.debug(
+                "Groq rerank returned no index (response %s)",
+                truncate(text),
+            )
             return None
 
         index = int(match.group())
-        print(f"[rerank_with_groq] parsed index={index}")
         if index == -1:
-            print("[rerank_with_groq] Groq rejected all candidates")
             return None
         if 0 <= index < len(candidates):
-            selected = candidates[index]
-            print(
-                "[rerank_with_groq] selected "
-                f"{_format_candidate(index, selected)}"
-            )
-            return selected
-        print(f"[rerank_with_groq] index out of range: {index}")
+            logger.debug("Groq rerank selected candidate %d of %d", index, len(candidates))
+            return candidates[index]
+        logger.warning("Groq rerank index out of range: %d", index)
     except Exception:
-        logger.exception("Groq rerank failed for query=%r", query)
+        logger.exception("Groq rerank failed")
         raise
 
     return None

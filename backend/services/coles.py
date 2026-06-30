@@ -1,10 +1,10 @@
-import json
 import logging
 import os
 
 import requests
 
 from services.cache import get_cached_search, set_cached_search
+from services.log_util import truncate
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ def search_item(query: str, page_size: int = 3) -> list[dict]:
     """Search Coles catalog; return up to page_size normalized product dicts."""
     cached = get_cached_search("coles", query, page_size)
     if cached is not None:
-        print(f"[Coles API] cache hit query={query!r}")
+        logger.debug("Coles cache hit (page_size=%d)", page_size)
         return cached
 
     api_key = os.getenv("RAPIDAPI_KEY")
@@ -53,11 +53,16 @@ def search_item(query: str, page_size: int = 3) -> list[dict]:
         )
         response.raise_for_status()
         data = response.json()
-        print(f"[Coles API] query={query!r}")
+        result_count = len(data.get("results", []))
+        logger.debug("Coles search returned %d result(s)", result_count)
         if _debug_api_responses():
-            print(json.dumps(data, indent=2))
+            logger.debug(
+                "Coles API debug payload (%d result(s), query %s)",
+                result_count,
+                truncate(query),
+            )
     except (requests.RequestException, ValueError):
-        logger.exception("Coles search failed for query=%r", query)
+        logger.exception("Coles search failed (query %s)", truncate(query))
         raise
 
     results = []

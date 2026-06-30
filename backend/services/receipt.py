@@ -1,5 +1,6 @@
 import base64
 import json
+import logging
 import os
 import re
 import time
@@ -8,7 +9,10 @@ from google import genai
 from google.genai import types
 from google.genai.errors import ServerError
 
+from services.log_util import truncate
 from services.matching import filter_comparable_items
+
+logger = logging.getLogger(__name__)
 
 RECEIPT_MODEL = "gemini-2.5-flash"
 MAX_GEMINI_RETRIES = 3
@@ -87,7 +91,10 @@ def _parse_items_json(text: str) -> list[str]:
         if parsed is not None:
             return parsed
 
-    print(f"[receipt] JSON parse failed for response={text!r}")
+    logger.warning(
+        "Receipt JSON parse failed (response %s)",
+        truncate(text),
+    )
     return []
 
 
@@ -119,18 +126,19 @@ def extract_items_from_receipt(
             except ServerError as exc:
                 if exc.code == 503 and attempt < MAX_GEMINI_RETRIES - 1:
                     delay = RETRY_BACKOFF_SECONDS[attempt]
-                    print(
-                        f"[receipt] Gemini 503, retry {attempt + 1}/"
-                        f"{MAX_GEMINI_RETRIES} in {delay}s"
+                    logger.info(
+                        "Gemini 503, retry %d/%d in %ss",
+                        attempt + 1,
+                        MAX_GEMINI_RETRIES,
+                        delay,
                     )
                     time.sleep(delay)
                     continue
-                print(f"[receipt] extraction failed: {exc!r}")
+                logger.error("Gemini extraction failed with code %s", exc.code)
                 raise
 
     text = (response.text or "").strip()
-    print(f"[receipt] Gemini raw response={text!r}")
     items = _parse_items_json(text)
     items = filter_comparable_items(items)
-    print(f"[receipt] parsed {len(items)} item(s): {items}")
+    logger.info("Receipt extraction parsed %d item(s)", len(items))
     return items

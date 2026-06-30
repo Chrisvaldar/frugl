@@ -1,3 +1,4 @@
+import logging
 from concurrent.futures import ThreadPoolExecutor
 
 from services.groq_reranker import rerank_with_groq
@@ -13,6 +14,8 @@ from services.matching import (
     normalise_unit_price,
     store_staple_search_term,
 )
+
+logger = logging.getLogger(__name__)
 
 RECEIPT_CANDIDATE_LIMIT = 10
 MAX_CONCURRENT_ITEMS = 5
@@ -174,10 +177,6 @@ def _fetch_raw_results(
     """Fetch store search results for a single list item."""
     if source == "receipt":
         search_term = normalize_receipt_search_query(item)
-        print(
-            f"[compare_basket] receipt item={item!r} "
-            f"normalized_search={search_term!r}"
-        )
         w_raw, c_raw = _search_both_stores(
             search_term, search_term, page_size=RECEIPT_CANDIDATE_LIMIT
         )
@@ -202,15 +201,8 @@ def _process_single_item(item: str, source: str) -> dict:
     search_term, w_raw, c_raw = _fetch_raw_results(item, source, search_type)
 
     if source == "receipt":
-        print(
-            f"[compare_basket] receipt rerank for item={item!r} "
-            f"w_candidates={len(w_raw)} c_candidates={len(c_raw)}"
-        )
         w_match = rerank_with_groq(item, w_raw) if w_raw else None
         c_match = rerank_with_groq(item, c_raw) if c_raw else None
-        w_name = w_match.get("name") if w_match else None
-        c_name = c_match.get("name") if c_match else None
-        print(f"[compare_basket] receipt picks w={w_name!r} c={c_name!r}")
     else:
         w_match = pick_best_match(item, w_raw, search_type, search_term=search_term)
         c_match = pick_best_match(item, c_raw, search_type, search_term=search_term)
@@ -248,7 +240,7 @@ def _process_single_item(item: str, source: str) -> dict:
 def compare_basket(items: list[str], source: str = "manual") -> dict:
     """Compare a shopping list across Woolworths and Coles."""
     items = filter_comparable_items(items)
-    print(f"[compare_basket] source={source!r} items={len(items)}")
+    logger.info("Comparing basket: source=%s items=%d", source, len(items))
     if not items:
         return {
             "winner": "tie",
