@@ -1,9 +1,12 @@
+import logging
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from services.compare import compare_basket
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -18,7 +21,7 @@ class CompareRequest(BaseModel):
 def compare(request: CompareRequest):
     try:
         source = request.source or "manual"
-        print(f"[compare router] source={source!r} items={len(request.items)}")
         return compare_basket(request.items, source=source)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.exception("Unexpected comparison error")
+        raise HTTPException(status_code=500, detail="Comparison failed. Try again later") from e

@@ -1,9 +1,12 @@
 import json
+import logging
 import os
 
 import requests
 
 from services.cache import get_cached_search, set_cached_search
+
+logger = logging.getLogger(__name__)
 
 WOOLWORTHS_SEARCH_URL = (
     "https://woolworths-products-api.p.rapidapi.com/woolworths/product-search/"
@@ -54,7 +57,8 @@ def search_item(query: str, page_size: int = 3) -> list[dict]:
         if _debug_api_responses():
             print(json.dumps(data, indent=2))
     except (requests.RequestException, ValueError):
-        return []
+        logger.exception("Woolworths search failed for query=%r", query)
+        raise
 
     results = []
     for item in data.get("results", [])[:page_size]:

@@ -1,7 +1,10 @@
+import logging
 import os
 import re
 
 from groq import Groq
+
+logger = logging.getLogger(__name__)
 
 RERANK_MODEL = "llama-3.1-8b-instant"
 
@@ -176,8 +179,8 @@ def rerank_with_groq(query: str, candidates: list[dict]) -> dict | None:
             )
             return selected
         print(f"[rerank_with_groq] index out of range: {index}")
-    except Exception as exc:
-        print(f"[rerank_with_groq] error={exc!r}")
-        return None
+    except Exception:
+        logger.exception("Groq rerank failed for query=%r", query)
+        raise
 
     return None
