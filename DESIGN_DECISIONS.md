@@ -165,7 +165,32 @@ Shared steps for both: `detect_search_type()` (brand vs generic), staple expansi
 
 ### Error handling
 
-**Decision:** Compare failure → `error` view with list kept. Receipt errors inline on the upload tab.
+**Frontend:** Compare failure → `error` view with list kept. Receipt errors inline on the upload tab. [`frontend/src/lib/api.js`](frontend/src/lib/api.js) reads `detail` from error JSON responses.
+
+**Backend `/api/compare`** ([`backend/routers/compare.py`](backend/routers/compare.py)): specific handlers before a last-resort 500. Client messages are generic; full errors go to server logs only.
+
+| Upstream failure | HTTP | `detail` (client) |
+|------------------|------|-------------------|
+| RapidAPI timeout | 504 | Store price lookup timed out. Try again. |
+| RapidAPI connection failure | 503 | Unable to reach store price service. Try again. |
+| RapidAPI HTTP error or other request error | 502 | Store price lookup failed. Try again. |
+| Invalid JSON from store API | 502 | Store returned invalid data. Try again. |
+| Groq rerank failure (`source: receipt`) | 502 | Product matching unavailable. Try again. |
+| Anything else unexpected | 500 | Comparison failed. Try again later. |
+
+**Backend `/api/receipt`** ([`backend/routers/receipt.py`](backend/routers/receipt.py)):
+
+| Upstream failure | HTTP | `detail` (client) |
+|------------------|------|-------------------|
+| Gemini overloaded (503) | 503 | Receipt scanner is busy. Please try again in a moment. |
+| Invalid base64 image | 400 | Invalid receipt image encoding. |
+| Other Gemini server errors | 502 | Gemini error text (`str(exc)`) |
+| Gemini client error | 502 | Receipt scanner could not process this image. |
+| Anything else unexpected | 500 | Receipt scan failed. Please try again. |
+
+**Service layer:** [`backend/services/receipt.py`](backend/services/receipt.py) returns an empty item list when Gemini is unavailable or parsing fails (no 500 for OCR miss). [`backend/services/groq_reranker.py`](backend/services/groq_reranker.py) logs and re-raises `GroqAPIError` so the compare router can map it.
+
+**Reference:** [`backend/tests/test_compare_router.py`](backend/tests/test_compare_router.py) for compare HTTP mapping tests.
 
 ---
 
@@ -203,7 +228,7 @@ Shared steps for both: `detect_search_type()` (brand vs generic), staple expansi
 
 ### Gated API debug logs
 
-**Decision:** Full RapidAPI JSON only if `DEBUG_API_RESPONSES=true`.
+**Decision:** Extra RapidAPI debug log lines (result counts and truncated query) only if `DEBUG_API_RESPONSES=true`. Full JSON bodies are not logged.
 
 ---
 
@@ -223,7 +248,7 @@ Shared steps for both: `detect_search_type()` (brand vs generic), staple expansi
 
 ## Testing
 
-**Decision:** `test_compare.py` and `test_matching.py` with mocked APIs; `test_cache.py`, `test_rate_limit.py`, `test_groq_reranker.py`, `test_receipt_parse.py`. **44** pytest tests total; GitHub Actions runs them on push.
+**Decision:** `test_compare.py`, `test_compare_router.py`, and `test_matching.py` with mocked APIs; `test_cache.py`, `test_rate_limit.py`, `test_groq_reranker.py`, `test_receipt_parse.py`. **51** pytest tests total; GitHub Actions runs them on push.
 
 ---
 

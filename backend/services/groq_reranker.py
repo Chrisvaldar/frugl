@@ -2,6 +2,7 @@ import logging
 import os
 import re
 
+from groq import APIError as GroqAPIError
 from groq import Groq
 
 from services.log_util import truncate
@@ -177,7 +178,7 @@ def rerank_with_groq(query: str, candidates: list[dict]) -> dict | None:
             logger.debug("Groq rerank selected candidate %d of %d", index, len(candidates))
             return candidates[index]
         logger.warning("Groq rerank index out of range: %d", index)
-    except Exception:
+    except GroqAPIError:
         logger.exception("Groq rerank failed")
         raise
 

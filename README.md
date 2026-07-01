@@ -97,7 +97,7 @@ cd backend
 pytest
 ```
 
-Right now that's **44 tests** (compare, matching, receipt parsing, cache, rate limit). They mock external APIs so you don't burn RapidAPI credits in CI.
+Right now that's **51 tests** (compare service + router, matching, receipt parsing, cache, rate limit, Groq reranker). They mock external APIs so you don't burn RapidAPI credits in CI.
 
 GitHub Actions runs the same on push/PR (see `.github/workflows/backend-tests.yml`).
 
@@ -112,7 +112,11 @@ Copy `backend/.env.example` to `backend/.env`. **Do not commit `.env`.**
 | `GROQ_API_KEY` | Rerank store search results for receipt items |
 | `SEARCH_CACHE_TTL_SECONDS` | Optional. Cache search results (default 900 = 15 min) |
 | `RATE_LIMIT_PER_MINUTE` | Optional. Max `/api/*` requests per IP per minute (default 30) |
-| `DEBUG_API_RESPONSES` | Optional. Set `true` to dump full RapidAPI JSON in logs |
+| `DEBUG_API_RESPONSES` | Optional. Set `true` for extra RapidAPI debug log lines (result counts; no full JSON bodies) |
+
+### API error responses
+
+`/api/compare` and `/api/receipt` return FastAPI `detail` strings the frontend surfaces in the UI. Compare maps upstream failures to specific status codes (see [DESIGN_DECISIONS.md](DESIGN_DECISIONS.md#error-handling)). Receipt scan returns 400 for bad image encoding, 503 when Gemini is overloaded, and 502 for other scanner failures.
 
 On Vercel you only need **`VITE_API_URL`** set to your backend base URL (no trailing slash).
 
