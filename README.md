@@ -2,7 +2,7 @@
 
 Grocery price comparison for Coles vs Woolworths. Type a weekly list (or scan a receipt), compare prices, and see which store is cheaper overall plus a per-item breakdown.
 
-**Live app:** [https://open-home-loans-take-home-task.vercel.app/](https://open-home-loans-take-home-task.vercel.app/)
+**Live app:** [https://frugl.vercel.app/](https://frugl.vercel.app/)
 
 **Video:** [https://youtu.be/KdDWbSQ2k9Y](https://youtu.be/KdDWbSQ2k9Y)
 
